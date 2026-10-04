@@ -52,6 +52,8 @@ def chat(args, messages):
             "temperature": args.temperature, "top_p": args.top_p, "stream": False}
     if args.max_tokens:
         body["max_tokens"] = args.max_tokens
+    if args.chat_template_kwargs:
+        body["chat_template_kwargs"] = json.loads(args.chat_template_kwargs)
     headers = {"Content-Type": "application/json"}
     if args.api_key:
         headers["Authorization"] = f"Bearer {args.api_key}"
@@ -114,6 +116,12 @@ def main():
     p.add_argument("--timeout", type=int, default=300)
     p.add_argument("--tags-url", default="http://127.0.0.1:11434/api/tags",
                    help="Ollama /api/tags URL used to record the model digest")
+    p.add_argument("--digest", default=None,
+                   help="record this digest verbatim instead of querying --tags-url "
+                        "(use the GGUF sha256 for non-Ollama servers)")
+    p.add_argument("--chat-template-kwargs", default=None,
+                   help="JSON object merged into every request body, e.g. "
+                        "'{\"enable_thinking\": false}' to disable Qwen3 thinking mode")
     p.add_argument("--cases", default="cases")
     p.add_argument("--only", nargs="*", help="category names or case ids to run")
     p.add_argument("--out", required=True, help="output directory")
@@ -126,7 +134,7 @@ def main():
     cases = load_cases(args.cases, args.only)
     os.makedirs(args.out, exist_ok=True)
     out = os.path.join(args.out, "transcript.jsonl")
-    digest = get_digest(args)
+    digest = args.digest or get_digest(args)
     prev = last_chain(out)
     print(f"{len(cases)} cases | model={args.model} digest={digest}", flush=True)
 
