@@ -211,7 +211,7 @@ Reading the diff, not just the totals:
 
 ## Interactive lab
 
-`lab/server.py` is a localhost-only learning UI over the harness (stdlib only,
+`lab/server.py` is a learning UI (binds the Tailscale interface when available; localhost fallback) over the harness (stdlib only,
 same design). Run it with:
 
 ```bash

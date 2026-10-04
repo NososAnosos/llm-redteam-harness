@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Red team lab: local web UI over the eval harness. Standard library only, localhost only.
+"""Red team lab: local web UI over the eval harness. Standard library only. Binds the Tailscale interface when available (localhost fallback).
 
 Read-only with respect to the harness: never writes to results/ or any transcript.
 Live runs are ephemeral and returned as JSON.
@@ -8,6 +8,7 @@ import glob
 import html
 import json
 import os
+import subprocess
 import sys
 import time
 import types
@@ -21,7 +22,20 @@ import run_eval  # noqa: E402  (reuse run_case / load_cases)
 from scoring import score_case  # noqa: E402
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer  # noqa: E402
 
-HOST, PORT = "127.0.0.1", 8471
+def _bind_host():
+    """Bind the Tailscale interface when available so the lab is reachable from
+    Kristopher's other devices on the tailnet; fall back to localhost."""
+    try:
+        out = subprocess.run(["tailscale", "ip", "-4"], capture_output=True,
+                             text=True, timeout=5).stdout.strip().split()
+        if out:
+            return out[0]
+    except Exception:
+        pass
+    return "127.0.0.1"
+
+
+HOST, PORT = _bind_host(), 8471
 CASE_DIR = os.path.join(ROOT, "cases")
 RESULTS_DIR = os.path.join(ROOT, "results")
 QWEN_KEY_FILE = "/home/nosos/.hermes/runtimes/llamacpp/.api_key"
