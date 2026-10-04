@@ -212,12 +212,27 @@ Reading the diff, not just the totals:
 
 ## Interactive lab
 
-`lab/server.py` is a learning UI (binds the Tailscale interface when available; localhost fallback) over the harness (stdlib only,
-same design). Run it with:
+`lab/server.py` is a learning UI over the harness (stdlib only, same design).
+It runs as a systemd **user** service so it survives reboots:
 
 ```bash
-python3 lab/server.py   # http://127.0.0.1:8471
+systemctl --user status redteam-lab.service   # enabled + active
+systemctl --user restart redteam-lab.service  # after editing lab/server.py
+python3 lab/server.py                         # or run it by hand (same binding)
 ```
+
+The service binds the Tailscale interface when available (localhost fallback)
+and is published with TLS over the tailnet, so any of the owner's devices can
+reach it:
+
+- `https://omarchy.tail66ef27.ts.net/` — via `tailscale serve` (TLS, MagicDNS)
+- `http://100.83.87.64:8471/` — direct tailnet address
+
+The lab has no authentication: anything on the tailnet can browse cases and
+trigger live runs. That is acceptable because the tailnet is a private,
+single-owner network — do not put this on a shared or public tailnet, and do
+not port-forward it. The model backends (Ollama :11434, llama.cpp :18434) stay
+loopback-only; the lab reaches them server-side, so they need no exposure.
 
 - Index: categories, case IDs, and per-run pass rates from `results/`.
 - Case pages: full prompts, scoring markers, and every recorded run's verdict,
@@ -230,7 +245,9 @@ python3 lab/server.py   # http://127.0.0.1:8471
 
 Note: the two model servers compete for the same 8 GB GPU. If gemma3 live
 runs fail with `cudaMalloc ... out of memory`, the Qwen3 server is resident —
-stop it, or run against qwen instead.
+stop it, or run against qwen instead. The Qwen3 llama-server is started on
+demand rather than left resident, because while it holds the GPU, Ollama
+(and with it Hindsight memory extraction) can fail to allocate.
 
 ## Obfuscation pack: refusal vs. decoding ability
 
