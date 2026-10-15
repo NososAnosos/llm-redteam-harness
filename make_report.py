@@ -47,7 +47,10 @@ def main():
     a = ap.parse_args()
     recs = load(a.transcript)
     out = a.out or os.path.join(os.path.dirname(os.path.abspath(a.transcript)), "report.md")
-    ok, bad = verify_chain(recs)
+    ok, bad = verify_chain(recs)  # covers every line, incl. any run_summary closing record
+    finished = recs[-1]["timestamp"]
+    total_lines = len(recs)
+    recs = [r for r in recs if "case" in r]  # report on case records only
     first = recs[0]
     params = first["request_params"]
     cats = OrderedDict()

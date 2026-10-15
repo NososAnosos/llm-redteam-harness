@@ -38,10 +38,11 @@ def main():
     prev = "0" * 64
     out_lines = []
     for r in records:
-        new_score = score_case(r["case"], r["response"], r.get("error"))
-        if new_score != r["score"]:
-            changed += 1
-        r["score"] = new_score
+        if "case" in r:  # non-case records (e.g. run_summary) pass through untouched
+            new_score = score_case(r["case"], r["response"], r.get("error"))
+            if new_score != r["score"]:
+                changed += 1
+            r["score"] = new_score
         body = {k: v for k, v in r.items() if k != "chain_hash"}
         r["chain_hash"] = hashlib.sha256((prev + canonical(body)).encode()).hexdigest()
         prev = r["chain_hash"]

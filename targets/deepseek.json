@@ -1,0 +1,11 @@
+{
+  "_comment": "DeepSeek hosted API (https://platform.deepseek.com). Before running: (1) confirm the exact model id on the provider dashboard and replace MODEL_ID_PLACEHOLDER below, and pass the same string via --digest so the transcript pins it verbatim; (2) replace the PLACEHOLDER prices with current rates; (3) supply the key from the environment at run time: --api-key \"$DEEPSEEK_API_KEY\". Never put a key in this file.",
+  "base_url": "https://api.deepseek.com/v1",
+  "model": "MODEL_ID_PLACEHOLDER",
+  "timeout": 120,
+  "prices": {
+    "_comment": "PLACEHOLDER rates, USD per 1M tokens. Replace with current provider pricing before trusting any cost figure.",
+    "input_per_1m": 0.3,
+    "output_per_1m": 1.2
+  }
+}
