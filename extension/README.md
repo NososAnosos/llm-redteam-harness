@@ -1,4 +1,4 @@
-# Red-Team Drafting Assistant (v0.2.0)
+# Red-Team Drafting Assistant (v0.3.0)
 
 A Chrome/Chromium (Manifest V3) side-panel extension that helps a human red-teamer **draft**
 prompts for AI red-teaming contests (e.g. Gray Swan Arena). Drafting uses a local Ollama model and
@@ -42,10 +42,23 @@ Regenerate the technique list after editing cases: `python3 extension/build_taxo
 ## Usage
 
 - **Draft**: paste the objective (and optionally scenario context) yourself, tick technique
-  families, choose N, click *Draft variants*. Each variant has Copy, Mark worked, Mark failed, and
-  a notes field. Paste into the contest site and send it yourself.
-- **Attempt log**: local history with technique, outcome, timestamp. *Export JSONL* saves a local
-  file with a per-line SHA-256 `chain_hash` using the same convention as `run_eval.py`.
+  families, choose N, click *Draft variants*. Each variant is an **attempt** with a chat thread;
+  turn 1 is the drafted message. Paste into the contest site and send it yourself.
+- **Multi-turn threads** (v0.3): *Copy* on one of your turns marks it **Sent**. Paste the target's
+  answer into the **Target reply** box (Enter or *Add*; Shift+Enter for a newline) to append a
+  Target turn. *Draft next turn* sends the objective, technique, context and the full thread to the
+  selected provider (Ollama or hosted) and returns N follow-up options; *Use* appends one as your
+  next turn, then Copy it and send it yourself. Your turns render right-aligned, the target's
+  left, with turn numbers. *Delete last turn* removes the final turn. Think-stripping and refusal
+  flagging apply to follow-ups too. Target replies are framed to the drafter as untrusted observed
+  output. *Mark worked at → Turn N* / *Mark failed* apply to the whole attempt and record which
+  turn broke it. There is a single attempt-level note.
+- **Attempt log**: local history with technique, outcome, turn count, timestamp. *Export JSONL*
+  saves a local file with a per-line SHA-256 `chain_hash` using the same convention as
+  `run_eval.py`. Each line includes the full `thread` (turn, role, text, sent, ts), `broke_turn`
+  and `note`; never the API key. Older v0.2 entries are migrated on load (draft becomes turn 1,
+  old notes become the attempt note). Export schema changed (`draft`/`notes` replaced by
+  `thread`/`note`), so chain hashes differ from v0.2 exports.
 - **Settings**: provider (Local Ollama / Hosted), Ollama URL (localhost / 127.0.0.1 only), model,
   hosted preset + model id + API key, temperature, default variant count.
 

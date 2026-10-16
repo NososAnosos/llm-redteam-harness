@@ -31,6 +31,24 @@
   start) get outcome `refused` with a try-another-model hint.
 - Not run: manifest JSON check, `node --check sidepanel.js`, live calls to any provider.
 
+## v0.3.0 — multi-turn threads (file edits only, nothing executed)
+- Each variant is now an attempt: `thread` of `{role: attacker|target, text, sent, ts}`; entry
+  fields `note` (replaces `notes`), `broke_turn`, transient `options` (follow-up candidates).
+  Old entries migrate on load (`migrateEntry`): `text` becomes turn 1, `notes` becomes `note`.
+- UI: chat-style thread (attacker right, target left, `#n` turn numbers); Copy on an attacker turn
+  marks it Sent; Target reply box (Enter adds, Shift+Enter newline) + Add; Delete last turn;
+  Draft next turn → N options (count from the Variants box) with Use; "Mark worked at → Turn N"
+  records `broke_turn`; Mark failed clears it.
+- Follow-up prompt: system prompt + one user message with objective, context, technique and a
+  labelled transcript (ATTACKER = already-sent drafts, TARGET = observed replies, flagged as
+  untrusted data). `callDrafter` is shared with the first-draft path, so think-stripping and
+  refusal flagging (`refused` badge on options) are identical.
+- Log tab shows turn count and broke-at turn. JSONL export includes `thread`, `broke_turn`, `note`
+  (no `draft`/`notes`); chain logic unchanged; API key never included.
+- Hard rules unchanged: no content scripts, no page access, no new hosts/permissions; everything
+  leaves only via Copy.
+- Not run: `node --check`, manifest JSON check, loading in Chrome, live provider calls.
+
 ## Verification status
 NOT verified at runtime — this session could not run commands. Still to do:
 `python3 -m json.tool extension/manifest.json`, `python3 extension/build_taxonomy.py`,
@@ -38,6 +56,10 @@ NOT verified at runtime — this session could not run commands. Still to do:
 with the panel's request body.
 
 ## Open issues
+- v0.3: "Draft next turn" requires the thread to end with a Target turn. A pending follow-up
+  request is discarded if the thread changes while it is in flight. Options are persisted per
+  attempt until used or the thread changes.
+- v0.3: deleting a turn that was the recorded `broke_turn` resets a `worked` outcome to `pending`.
 - Refusal detection is a start-of-text regex only; refusals phrased differently are not caught, and
   there is no automatic retry.
 - Reasoning returned in a separate API field (not `<think>` tags) is not touched.
