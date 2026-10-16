@@ -2,17 +2,34 @@
  *
  * Hard rules enforced by design:
  * - No content scripts, no page interaction. Drafts leave only via Copy buttons.
- * - The ONLY network endpoint contacted is the user-configured local Ollama URL
+ * - The ONLY network endpoints contacted are the user-configured local Ollama URL
+ *   or, when Provider = Hosted, one of the fixed HOSTED_PRESETS base URLs
  *   (plus chrome-extension-local taxonomy.json, which is bundled, not network).
  * - Everything is stored in chrome.storage.local. No telemetry, no sync.
+ *   The hosted API key lives under its own storage key, is never logged,
+ *   exported, or shown again after save.
  * - No feature identifies, fingerprints, or labels the contest target model.
  */
 
 'use strict';
 
+// Hosted drafting providers (OpenAI-compatible). Base URLs are fixed: anything
+// not in this list is refused, and manifest host_permissions match exactly these.
+const HOSTED_PRESETS = {
+  deepseek: { name: 'DeepSeek', base: 'https://api.deepseek.com/v1' },
+  moonshot: { name: 'Moonshot Kimi', base: 'https://api.moonshot.ai/v1' },
+  openrouter: { name: 'OpenRouter', base: 'https://openrouter.ai/api/v1' },
+  groq: { name: 'Groq', base: 'https://api.groq.com/openai/v1' },
+};
+
+const API_KEY_STORAGE = 'hostedApiKey';
+
 const DEFAULT_SETTINGS = {
+  provider: 'ollama', // 'ollama' | 'hosted'
   ollamaUrl: 'http://localhost:11434',
   model: '',
+  hostedPreset: 'deepseek',
+  hostedModel: '',
   temperature: 0.8,
   variantCount: 3,
 };
@@ -82,6 +99,7 @@ async function buildExportLines() {
       objective: entry.objective,
       context: entry.context || '',
       technique: entry.technique || 'general',
+      drafting_provider: entry.provider || 'ollama',
       drafting_model: entry.model,
       draft: entry.text,
       outcome: entry.outcome,
@@ -142,25 +160,93 @@ function buildUserPrompt(objective, context, technique) {
   return msg;
 }
 
+function isHosted() {
+  return state.settings.provider === 'hosted';
+}
+
+function activeModel() {
+  return isHosted() ? state.settings.hostedModel : state.settings.model;
+}
+
+// Resolve the hosted base URL from the preset list only; never from free text.
+function hostedBase() {
+  const preset = HOSTED_PRESETS[state.settings.hostedPreset];
+  if (!preset || !Object.values(HOSTED_PRESETS).some((p) => p.base === preset.base)) {
+    throw new Error('Hosted base URL is not in the allowed preset list');
+  }
+  return preset.base;
+}
+
+async function hostedFetch(path, options = {}) {
+  const base = hostedBase();
+  const stored = await storageGet([API_KEY_STORAGE]);
+  const key = stored[API_KEY_STORAGE];
+  if (!key) throw new Error('No API key saved for the hosted provider');
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  try {
+    const resp = await fetch(base + path, {
+      ...options,
+      headers: { ...(options.headers || {}), Authorization: 'Bearer ' + key },
+      signal: controller.signal,
+    });
+    // Status only: never echo headers or request details that could include the key.
+    if (!resp.ok) throw new Error(`Hosted provider returned HTTP ${resp.status}`);
+    return await resp.json();
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+// Remove <think>...</think> blocks (and an unterminated trailing <think>...).
+function stripThink(text) {
+  return text
+    .replace(/<think>[\s\S]*?<\/think>/gi, '')
+    .replace(/<think>[\s\S]*$/i, '')
+    .replace(/^[\s\S]*?<\/think>/i, '')
+    .trim();
+}
+
+const REFUSAL_RE = /^\W*(i cannot|i can't|i can’t|i am unable|i'm unable|i’m unable)\b/i;
+
+function looksRefused(text) {
+  return REFUSAL_RE.test(text);
+}
+
 async function draftOne(objective, context, technique) {
-  const body = {
-    model: state.settings.model,
-    messages: [
-      { role: 'system', content: SYSTEM_PROMPT },
-      { role: 'user', content: buildUserPrompt(objective, context, technique) },
-    ],
-    stream: false,
-    options: { temperature: state.settings.temperature },
-  };
-  const data = await ollamaFetch('/api/chat', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  });
-  const text = data && data.message && typeof data.message.content === 'string'
-    ? data.message.content.trim()
-    : '';
-  if (!text) throw new Error('Ollama returned an empty draft');
+  const messages = [
+    { role: 'system', content: SYSTEM_PROMPT },
+    { role: 'user', content: buildUserPrompt(objective, context, technique) },
+  ];
+  let raw;
+  if (isHosted()) {
+    const data = await hostedFetch('/chat/completions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: state.settings.hostedModel,
+        messages,
+        temperature: state.settings.temperature,
+        stream: false,
+      }),
+    });
+    const msg = data && data.choices && data.choices[0] && data.choices[0].message;
+    raw = msg && typeof msg.content === 'string' ? msg.content : '';
+  } else {
+    const data = await ollamaFetch('/api/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: state.settings.model,
+        messages,
+        stream: false,
+        options: { temperature: state.settings.temperature },
+      }),
+    });
+    raw = data && data.message && typeof data.message.content === 'string' ? data.message.content : '';
+  }
+  const text = stripThink(raw);
+  if (!text) throw new Error('Model returned an empty draft');
   return text;
 }
 
@@ -267,6 +353,13 @@ function renderDrafts() {
     head.appendChild(badge);
     card.appendChild(head);
 
+    if (entry.outcome === 'refused') {
+      const hint = document.createElement('div');
+      hint.className = 'hint';
+      hint.textContent = 'Refused — the drafting model declined. Try another model (or provider) in Settings.';
+      card.appendChild(hint);
+    }
+
     const text = document.createElement('div');
     text.className = 'draft-text';
     text.textContent = entry.text;
@@ -330,7 +423,7 @@ async function onDraftClick() {
     setStatus(statusEl, 'Enter an objective first.', true);
     return;
   }
-  if (!state.settings.model) {
+  if (!activeModel()) {
     setStatus(statusEl, 'Pick a drafting model in Settings first.', true);
     return;
   }
@@ -354,16 +447,19 @@ async function onDraftClick() {
             objective,
             context,
             technique: technique ? technique.id : null,
-            model: state.settings.model,
+            provider: isHosted() ? 'hosted:' + state.settings.hostedPreset : 'ollama',
+            model: activeModel(),
             text,
-            outcome: 'pending',
+            outcome: looksRefused(text) ? 'refused' : 'pending',
             notes: '',
           };
           state.log.push(entry);
           newIds.push(entry.id);
         })
         .catch((err) => {
-          setStatus(statusEl, `A draft failed: ${err.message}. Is Ollama running with OLLAMA_ORIGINS=chrome-extension://* ?`, true);
+          setStatus(statusEl, isHosted()
+            ? `A draft failed: ${err.message}. Check the preset, model id and API key in Settings.`
+            : `A draft failed: ${err.message}. Is Ollama running with OLLAMA_ORIGINS=chrome-extension://* ?`, true);
         })
         .finally(() => {
           done += 1;
@@ -381,7 +477,7 @@ async function onDraftClick() {
   if (newIds.length) {
     setStatus(statusEl, `${newIds.length} draft(s) ready. Copy a draft, then paste and send it yourself — the extension never touches the page.`);
   } else {
-    setStatus(statusEl, 'No drafts produced. Check Settings and that Ollama is reachable.', true);
+    setStatus(statusEl, 'No drafts produced. Check Settings and that the provider is reachable.', true);
   }
 }
 
@@ -416,7 +512,7 @@ function renderLog() {
 
     const meta = document.createElement('div');
     meta.className = 'meta';
-    meta.textContent = `${entry.ts} · drafting model: ${entry.model}` +
+    meta.textContent = `${entry.ts} · drafting model: ${entry.provider || 'ollama'}/${entry.model}` +
       (entry.notes ? ` · notes: ${entry.notes}` : '');
     card.appendChild(meta);
 
@@ -465,7 +561,38 @@ function isLocalOllamaUrl(url) {
   }
 }
 
+function applyProviderVisibility() {
+  const hosted = $('#set-provider').value === 'hosted';
+  $('#local-settings').hidden = hosted;
+  $('#hosted-settings').hidden = !hosted;
+}
+
+async function refreshKeyStatus() {
+  const stored = await storageGet([API_KEY_STORAGE]);
+  setStatus($('#key-status'), stored[API_KEY_STORAGE] ? 'API key saved (hidden).' : 'No API key saved.');
+}
+
+async function onClearKeyClick() {
+  await new Promise((resolve) => chrome.storage.local.remove(API_KEY_STORAGE, resolve));
+  $('#set-api-key').value = '';
+  await refreshKeyStatus();
+}
+
 function fillSettingsForm() {
+  $('#set-provider').value = state.settings.provider;
+  const presetSel = $('#set-preset');
+  presetSel.textContent = '';
+  for (const [id, p] of Object.entries(HOSTED_PRESETS)) {
+    const opt = document.createElement('option');
+    opt.value = id;
+    opt.textContent = `${p.name} — ${p.base}`;
+    presetSel.appendChild(opt);
+  }
+  presetSel.value = HOSTED_PRESETS[state.settings.hostedPreset] ? state.settings.hostedPreset : DEFAULT_SETTINGS.hostedPreset;
+  $('#set-hosted-model').value = state.settings.hostedModel;
+  $('#set-api-key').value = '';
+  applyProviderVisibility();
+  refreshKeyStatus();
   $('#set-url').value = state.settings.ollamaUrl;
   $('#set-temperature').value = state.settings.temperature;
   $('#set-variant-count').value = state.settings.variantCount;
@@ -515,7 +642,22 @@ async function onSaveSettings() {
     setStatus($('#settings-status'), 'Ollama URL must be http://localhost[:port] or http://127.0.0.1[:port].', true);
     return;
   }
+  const provider = $('#set-provider').value === 'hosted' ? 'hosted' : 'ollama';
+  const preset = $('#set-preset').value;
+  if (!HOSTED_PRESETS[preset]) {
+    setStatus($('#settings-status'), 'Hosted preset is not in the allowed list.', true);
+    return;
+  }
+  const newKey = $('#set-api-key').value.trim();
+  if (newKey) {
+    await storageSet({ [API_KEY_STORAGE]: newKey });
+    $('#set-api-key').value = '';
+    await refreshKeyStatus();
+  }
   const temp = parseFloat($('#set-temperature').value);
+  state.settings.provider = provider;
+  state.settings.hostedPreset = preset;
+  state.settings.hostedModel = $('#set-hosted-model').value.trim();
   state.settings.ollamaUrl = url;
   state.settings.model = $('#set-model').value;
   state.settings.temperature = Number.isFinite(temp) ? Math.max(0, Math.min(2, temp)) : DEFAULT_SETTINGS.temperature;
@@ -551,6 +693,8 @@ async function init() {
   $('#clear-log-btn').addEventListener('click', onClearLogClick);
   $('#save-settings-btn').addEventListener('click', onSaveSettings);
   $('#refresh-models-btn').addEventListener('click', refreshModels);
+  $('#clear-key-btn').addEventListener('click', onClearKeyClick);
+  $('#set-provider').addEventListener('change', applyProviderVisibility);
   $('#set-model').addEventListener('change', () => {
     state.settings.model = $('#set-model').value;
     saveSettings();

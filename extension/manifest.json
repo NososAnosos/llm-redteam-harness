@@ -1,12 +1,16 @@
 {
   "manifest_version": 3,
   "name": "Red-Team Drafting Assistant",
-  "version": "0.1.0",
-  "description": "Draft red-team prompts for authorized AI red-teaming contests using a local Ollama model. Drafts leave the extension only via the Copy button; nothing is ever typed, filled, clicked, or submitted on any web page.",
+  "version": "0.2.0",
+  "description": "Draft red-team prompts for authorized AI red-teaming contests using a local Ollama model or a hosted OpenAI-compatible preset. Drafts leave the extension only via the Copy button; nothing is ever typed, filled, clicked, or submitted on any web page.",
   "permissions": ["storage", "sidePanel"],
   "host_permissions": [
     "http://localhost/*",
-    "http://127.0.0.1/*"
+    "http://127.0.0.1/*",
+    "https://api.deepseek.com/*",
+    "https://api.moonshot.ai/*",
+    "https://openrouter.ai/*",
+    "https://api.groq.com/*"
   ],
   "background": {
     "service_worker": "background.js"

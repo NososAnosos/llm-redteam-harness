@@ -14,6 +14,7 @@ solution sharing; no attempts to identify which model is being tested.
   scripts that touch page DOM inputs. No `scripting` injection into contest pages.
 - Output leaves the extension only via a "Copy" button (clipboard). The human pastes and sends.
 - No feature that fingerprints, guesses, or labels the target model.
+- (v0.2: hosted OpenAI-compatible presets DeepSeek, Moonshot, OpenRouter, Groq are also allowed; key stays in chrome.storage.local.)
 - No network calls except to the user-configured local Ollama endpoint (default
   http://localhost:11434). No telemetry, no cloud sync, no sharing/export-to-others feature.
 - Drafts and the attempt log are stored locally only (chrome.storage.local).
@@ -38,7 +39,7 @@ solution sharing; no attempts to identify which model is being tested.
 3. Settings: Ollama URL, model, temperature, variant count.
 
 ## Non-goals for v0
-No auto-iteration loops against the target, no page reading, no hosted APIs, no Firefox.
+No auto-iteration loops against the target, no page reading, no Firefox. (Hosted drafters added in v0.2.)
 
 ## Deliverables
 - `extension/manifest.json`, side panel HTML/JS/CSS (plain JS, no build step), background service

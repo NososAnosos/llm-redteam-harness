@@ -49,13 +49,37 @@
     </section>
 
     <section id="tab-settings" class="tab-panel">
-      <label for="set-url">Ollama URL</label>
-      <input id="set-url" type="text" placeholder="http://localhost:11434">
+      <label for="set-provider">Provider</label>
+      <select id="set-provider">
+        <option value="ollama">Local Ollama</option>
+        <option value="hosted">Hosted (OpenAI-compatible)</option>
+      </select>
 
-      <label for="set-model">Drafting model <span class="hint">(local Ollama model used for drafting — never the contest target)</span></label>
-      <div class="row">
-        <select id="set-model"></select>
-        <button id="refresh-models-btn" title="Refresh from /api/tags">Refresh</button>
+      <div id="local-settings">
+        <label for="set-url">Ollama URL</label>
+        <input id="set-url" type="text" placeholder="http://localhost:11434">
+
+        <label for="set-model">Drafting model <span class="hint">(local Ollama model used for drafting — never the contest target)</span></label>
+        <div class="row">
+          <select id="set-model"></select>
+          <button id="refresh-models-btn" title="Refresh from /api/tags">Refresh</button>
+        </div>
+      </div>
+
+      <div id="hosted-settings" hidden>
+        <label for="set-preset">Hosted preset</label>
+        <select id="set-preset"></select>
+
+        <label for="set-hosted-model">Model id <span class="hint">(drafting model at that provider)</span></label>
+        <input id="set-hosted-model" type="text" placeholder="e.g. deepseek-chat" autocomplete="off">
+
+        <label for="set-api-key">API key <span class="hint">(stored only in chrome.storage.local; never shown again after save)</span></label>
+        <input id="set-api-key" type="password" autocomplete="off" placeholder="Paste key, then Save settings">
+        <div class="row">
+          <button id="clear-key-btn" class="danger">Clear key</button>
+        </div>
+        <div id="key-status" class="status" role="status"></div>
+        <p class="hint">Drafts are sent to the selected provider and its usage policies apply to what you send.</p>
       </div>
 
       <label for="set-temperature">Temperature</label>
@@ -69,7 +93,7 @@
       </div>
       <div id="settings-status" class="status" role="status"></div>
 
-      <p class="hint">The only network endpoint this extension ever contacts is the Ollama URL above. Ollama must allow extension origins: start it with <code>OLLAMA_ORIGINS=chrome-extension://*</code>.</p>
+      <p class="hint">The only network endpoints this extension contacts are the Ollama URL above or, if Hosted is selected, the one fixed preset base URL. Ollama must allow extension origins: start it with <code>OLLAMA_ORIGINS=chrome-extension://*</code>.</p>
     </section>
   </main>
 

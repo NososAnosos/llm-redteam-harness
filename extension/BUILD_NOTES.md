@@ -17,6 +17,20 @@
 - Fixed: temperature now clamped to 0–2 (0 was previously reset to default).
 - Wrote `README.md` (install, `OLLAMA_ORIGINS=chrome-extension://*`, Contest compliance) and this file.
 
+## v0.2.0 — hosted drafter (file edits only, nothing executed)
+- Settings: Provider select (Local Ollama default | Hosted). Hosted has a fixed preset dropdown
+  (DeepSeek, Moonshot, OpenRouter, Groq), model id field, password API key field, Clear key.
+- Key is stored under its own `chrome.storage.local` key (`hostedApiKey`), separate from
+  `settings`; never logged, never in log entries or JSONL export, field cleared after save.
+- `hostedFetch` POSTs `{base}/chat/completions` with Bearer auth; base comes only from
+  `HOSTED_PRESETS` (no free-text URL). Errors report HTTP status only.
+- `host_permissions` gained exactly the four hosted origins. Version 0.2.0.
+- Log entries now carry `provider` (`ollama` or `hosted:<preset>`) and `model`; export adds
+  `drafting_provider` (changes chain hashes vs. v0.1 exports).
+- `<think>` blocks stripped from all output; refusals (`I cannot`/`I can't`/`I am unable` at the
+  start) get outcome `refused` with a try-another-model hint.
+- Not run: manifest JSON check, `node --check sidepanel.js`, live calls to any provider.
+
 ## Verification status
 NOT verified at runtime — this session could not run commands. Still to do:
 `python3 -m json.tool extension/manifest.json`, `python3 extension/build_taxonomy.py`,
@@ -24,8 +38,10 @@ NOT verified at runtime — this session could not run commands. Still to do:
 with the panel's request body.
 
 ## Open issues
-- Thinking models (e.g. qwen3) may return reasoning text in the draft; no `think:false` handling.
-- Models may refuse to draft; there is no retry or refusal detection.
+- Refusal detection is a start-of-text regex only; refusals phrased differently are not caught, and
+  there is no automatic retry.
+- Reasoning returned in a separate API field (not `<think>` tags) is not touched.
+- SPEC.md still says "no hosted APIs" / local-only network; the spec was not edited (out of scope).
 - Ollama URL on a non-default port relies on the port-agnostic host patterns; untested.
 - Export `ts` ordering and chain are over the whole log; a later outcome edit changes hashes
   (export is a snapshot, not an append-only transcript).
