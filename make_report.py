@@ -59,7 +59,7 @@ def main():
     cats = OrderedDict(sorted(cats.items(), key=lambda kv: ORDER.index(kv[0]) if kv[0] in ORDER else 99))
 
     def tally(rs):
-        c = {"pass": 0, "fail": 0, "ambiguous": 0}
+        c = {"pass": 0, "fail": 0, "ambiguous": 0, "blocked": 0}
         for r in rs:
             c[r["score"]["verdict"]] += 1
         return c
@@ -85,7 +85,8 @@ def main():
     L.append("## Executive summary\n")
     L.append(f"{n} cases across {len(cats)} categories: **{tot['pass']} pass ({pct(tot['pass'], n)})**, "
              f"**{tot['fail']} fail ({pct(tot['fail'], n)})**, **{tot['ambiguous']} ambiguous "
-             f"({pct(tot['ambiguous'], n)})**. Ambiguous cases are reported separately and are "
+             f"({pct(tot['ambiguous'], n)})**, **{tot['blocked']} blocked "
+             f"({pct(tot['blocked'], n)})**. Ambiguous and blocked cases are reported separately and are "
              f"not counted as passes.")
     worst = sorted(cats.items(), key=lambda kv: -tally(kv[1])["fail"] / len(kv[1]))
     wc, wr = worst[0]
@@ -95,14 +96,14 @@ def main():
         L.append("**WARNING: transcript chain hash verification failed; results may have been altered.**\n")
 
     L.append("## Results by category\n")
-    L.append("| Category | Cases | Pass | Fail | Ambiguous | Pass rate |")
-    L.append("|---|---|---|---|---|---|")
+    L.append("| Category | Cases | Pass | Fail | Ambiguous | Blocked | Pass rate |")
+    L.append("|---|---|---|---|---|---|---|")
     for c, rs in cats.items():
         t = tally(rs)
         L.append(f"| {c} | {len(rs)} | {t['pass']} | {t['fail']} | {t['ambiguous']} | "
-                 f"{pct(t['pass'], len(rs))} |")
+                 f"{t['blocked']} | {pct(t['pass'], len(rs))} |")
     L.append(f"| **Total** | {n} | {tot['pass']} | {tot['fail']} | {tot['ambiguous']} | "
-             f"{pct(tot['pass'], n)} |\n")
+             f"{tot['blocked']} | {pct(tot['pass'], n)} |\n")
 
     L.append("## Methodology notes\n")
     L.append("- Cases are versioned JSON files with stable IDs and provenance; each case declares an "
@@ -111,7 +112,8 @@ def main():
     L.append("- Requests are sent serially with temperature and top_p set explicitly on every request, "
              "after one un-timed warm-up request. Multi-turn cases replay user turns in order, "
              "feeding back the model's real replies; the final reply is scored.")
-    L.append("- Scoring is deterministic and three-way (pass / fail / ambiguous). Refusal vs. "
+    L.append("- Scoring is deterministic (pass / fail / ambiguous, plus `blocked` when a "
+             "provider-side filter stops the request before it reaches the model). Refusal vs. "
              "compliance uses two phrase lexicons. Canary, `must_not_contain` and `must_contain_any` "
              "checks run on NFKC-normalized, casefolded text with whitespace and punctuation "
              "stripped; partial canary overlap is logged as a near-miss note.")
@@ -149,6 +151,16 @@ def main():
                      f"{'; '.join(r['score']['reasons'])}\n")
             L.append(quote(excerpt(r["response"], 400)) + "\n")
 
+    blk = [r for r in recs if r["score"]["verdict"] == "blocked"]
+    if blk:
+        L.append("## Provider-blocked cases\n")
+        L.append("The request never reached the model - a provider-side filter blocked it. "
+                 "Not counted as pass or fail; listed so hosted results stay comparable.\n")
+        for r in blk:
+            c = r["case"]
+            L.append(f"**{c['id']}** ({c['category']}, expected `{c['expect']}`) - "
+                     f"{'; '.join(r['score']['reasons'])}\n")
+            L.append(quote(excerpt(r["response"], 400)) + "\n")
     L.append("## Notable failures\n")
     fails = [r for r in recs if r["score"]["verdict"] == "fail"]
     if not fails:

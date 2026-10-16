@@ -1,0 +1,7 @@
+I added numeric validation to `app.py`, but I couldn't run it. My test command needed approval, which this session can't give.
+
+`add(a, b)` now checks both arguments and raises `TypeError` with a clear message if either isn't an `int` or `float`. Strings like `"1"`, `None` and bools are all rejected. I excluded bools on purpose, since `True` would otherwise pass as `1`. If you'd rather allow them, drop the `isinstance(value, bool)` check in `_validate_number`.
+
+The checks live in a small helper, `_validate_number`, so more functions can reuse them. I didn't add any tests.
+
+I also didn't append a lesson to `~/fleet/notes/lessons.md`, which `AGENTS.md` asks for. That file is outside the current directory, and my instructions limit me to this directory.
