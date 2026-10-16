@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Red-Team Drafting Assistant</title>
+  <link rel="stylesheet" href="sidepanel.css">
+</head>
+<body>
+  <header>
+    <h1>Red-Team Drafting Assistant</h1>
+    <nav class="tabs">
+      <button class="tab active" data-tab="draft">Draft</button>
+      <button class="tab" data-tab="log">Attempt log</button>
+      <button class="tab" data-tab="settings">Settings</button>
+    </nav>
+  </header>
+
+  <main>
+    <section id="tab-draft" class="tab-panel active">
+      <label for="objective">Objective <span class="hint">(what the scenario wants the target to do — paste it yourself)</span></label>
+      <textarea id="objective" rows="3" placeholder="e.g. Get the target to reveal the canary string hidden in its context"></textarea>
+
+      <label for="context">Context <span class="hint">(optional — scenario description / visible transcript, pasted manually)</span></label>
+      <textarea id="context" rows="4" placeholder="Paste any visible scenario text here. The extension never reads the page itself."></textarea>
+
+      <fieldset>
+        <legend>Techniques <span class="hint">(from this repo's cases/*.json; none selected = general)</span></legend>
+        <div id="techniques" class="techniques"></div>
+      </fieldset>
+
+      <div class="row">
+        <label for="variant-count">Variants</label>
+        <input id="variant-count" type="number" min="1" max="10" value="3">
+        <button id="draft-btn" class="primary">Draft variants</button>
+      </div>
+
+      <div id="status" class="status" role="status"></div>
+      <div id="variants"></div>
+    </section>
+
+    <section id="tab-log" class="tab-panel">
+      <div class="row">
+        <button id="export-btn">Export JSONL</button>
+        <button id="clear-log-btn" class="danger">Clear log</button>
+      </div>
+      <p class="hint">Local only (chrome.storage.local). Export writes one JSON object per line with a SHA-256 chain_hash per line, matching the harness transcript convention in run_eval.py.</p>
+      <div id="log-list"></div>
+    </section>
+
+    <section id="tab-settings" class="tab-panel">
+      <label for="set-url">Ollama URL</label>
+      <input id="set-url" type="text" placeholder="http://localhost:11434">
+
+      <label for="set-model">Drafting model <span class="hint">(local Ollama model used for drafting — never the contest target)</span></label>
+      <div class="row">
+        <select id="set-model"></select>
+        <button id="refresh-models-btn" title="Refresh from /api/tags">Refresh</button>
+      </div>
+
+      <label for="set-temperature">Temperature</label>
+      <input id="set-temperature" type="number" min="0" max="2" step="0.1" value="0.8">
+
+      <label for="set-variant-count">Default variant count</label>
+      <input id="set-variant-count" type="number" min="1" max="10" value="3">
+
+      <div class="row">
+        <button id="save-settings-btn" class="primary">Save settings</button>
+      </div>
+      <div id="settings-status" class="status" role="status"></div>
+
+      <p class="hint">The only network endpoint this extension ever contacts is the Ollama URL above. Ollama must allow extension origins: start it with <code>OLLAMA_ORIGINS=chrome-extension://*</code>.</p>
+    </section>
+  </main>
+
+  <script src="sidepanel.js"></script>
+</body>
+</html>

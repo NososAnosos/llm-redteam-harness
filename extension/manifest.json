@@ -1,0 +1,20 @@
+{
+  "manifest_version": 3,
+  "name": "Red-Team Drafting Assistant",
+  "version": "0.1.0",
+  "description": "Draft red-team prompts for authorized AI red-teaming contests using a local Ollama model. Drafts leave the extension only via the Copy button; nothing is ever typed, filled, clicked, or submitted on any web page.",
+  "permissions": ["storage", "sidePanel"],
+  "host_permissions": [
+    "http://localhost/*",
+    "http://127.0.0.1/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "side_panel": {
+    "default_path": "sidepanel.html"
+  },
+  "action": {
+    "default_title": "Open Red-Team Drafting Assistant"
+  }
+}
