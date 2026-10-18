@@ -122,7 +122,16 @@ def agy_call(prompt, model, timeout):
             break  # a hung hosted call is not worth retrying blindly
         err_tail = (p.stderr or "")[-2000:]
         if p.returncode == 0:
-            return p.stdout.strip(), err_tail
+            text = p.stdout.strip()
+            if text or attempt >= MAX_RETRIES:
+                return text, err_tail
+            # Known agy headless flake: empty stdout with a permission
+            # auto-deny on stderr (e.g. jetski: no output produced).
+            # Retry before scoring an empty response.
+            last_err = f"agy returned empty stdout: {err_tail[:300]}"
+            print(f"retry {attempt + 1}/{MAX_RETRIES}: empty stdout, "
+                  f"retrying", file=sys.stderr, flush=True)
+            continue
         last_err = f"agy exit {p.returncode}: {err_tail[:400]}"
         if not any(h in err_tail.lower() for h in RETRY_HINTS):
             break
