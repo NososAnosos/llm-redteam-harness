@@ -26,7 +26,11 @@ RETRY_CAP_S = 30.0
 
 def load_cases(case_dir, only=None):
     cases = []
-    for path in sorted(glob.glob(os.path.join(case_dir, "*.json"))):
+    if os.path.isfile(case_dir):
+        paths = [case_dir]
+    else:
+        paths = sorted(glob.glob(os.path.join(case_dir, "*.json")))
+    for path in paths:
         with open(path) as f:
             data = json.load(f)
         for c in data:

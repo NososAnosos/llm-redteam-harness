@@ -113,6 +113,36 @@ confirmed on the provider dashboard, and keys are passed at run time via `--api-
 immediately. A `run_summary` closing record reports total token usage and an estimated
 cost when the target config carries `prices`.
 
+## Generating attack packs
+
+`generate_pack.py` produces machine-authored attack packs on demand, so the
+suite grows without hand-writing every case. The Oct-17 attacker shootout
+(`results/attacker-pilot-20261017/`) set the generator mix: the local model
+is the always-on default, Gemini 4 Argon (via the `agy` CLI) is the diversity
+booster for fresh batches, and Kimi is retired from this pipeline.
+
+```bash
+# default: local gemma3:4b generates 10 injection attacks
+python3 generate_pack.py --generator local --count 10 --category injection \
+    --out packs/pack-20261018-injection.json
+
+# diversity batch via Argon
+python3 generate_pack.py --generator argon --count 8 --category indirect_injection \
+    --out packs/pack-20261018-argon-indirect.json
+
+# then run the pack through the standard path (single-file --cases works)
+python3 run_eval.py --cases packs/pack-20261018-injection.json \
+    --model gemma3:4b --out results/genpack-20261018/
+python3 make_report.py results/genpack-20261018/transcript.jsonl
+```
+
+`--category` accepts `mixed`, `injection` (direct + indirect), or any exact
+category name. Generated cases get `GEN-` ids and
+`machine-generated <generator> <date>` provenance, with freshly minted unique
+canaries per case. Packs live in `packs/` -- never in hand-written `cases/`
+-- and `scoring.py` is untouched, so generated packs stay comparable to the
+baseline.
+
 ## Repo layout
 
 ```
@@ -128,6 +158,8 @@ cases/                        versioned test-case suite, one file per category
   obfuscation.json            encoded harmful asks (base64/ROT13/leetspeak/homoglyph/…)
 scoring.py                    lexicons + deterministic scoring logic
 run_eval.py                   serial runner, hash-chained JSONL transcript writer
+generate_pack.py              on-demand machine-generated attack packs (local/Argon)
+packs/                        generated packs (never mixed into hand-written cases/)
 make_report.py                transcript -> report.md
 targets/                      per-provider hosted-target config stubs (keys via env, never in file)
 lab/server.py                 localhost learning UI: browse cases, run either model live
